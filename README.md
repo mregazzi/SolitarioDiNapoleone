@@ -9,3 +9,7 @@ Al centro ci sono i quattro Assi. Le altre 36 carte sono distribuite in otto rig
 Apri `index.html` in un browser, su computer o telefono. Non serve installare niente.
 
 Tocca la carta più esterna di una riga per mandarla dove può andare, oppure trascinala. Dopo ogni mossa il gioco controlla se la partita si può ancora vincere: se non si può, la dichiara persa.
+
+## Carte
+
+Le immagini delle 40 carte nella cartella `carte/` sono ritagliate dalla foto "Carte piacentine al completo.jpg" pubblicata su Wikipedia, liberamente utilizzabile.
