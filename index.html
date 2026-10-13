@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="it">
+<meta charset="utf-8">
+<title>Solitario di Napoleone</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+DW+Pica:ital@0;1&family=Alegreya+Sans:wght@400;500;700&display=swap">
+<style>
+/* Layout: tavolo di panno verde. Al centro la colonna dei quattro Assi, a sinistra e a destra di ognuno una riga di carte. Un solo look scuro, scelto apposta. */
+:root{
+  --felt:#1f4c37; --felt-deep:#11301f; --ink:#f3ead6; --muted:#b7c8b6; --gold:#d9a640; --line:rgba(243,234,214,.24);
+  --display:"IM Fell DW Pica", Georgia, "Times New Roman", serif;
+  --body:"Alegreya Sans", "Segoe UI", system-ui, sans-serif;
+  color-scheme: dark;
+}
+html,body{height:100%}
+body{margin:0;background-color:var(--felt-deep);background-image:radial-gradient(ellipse at 50% 35%, var(--felt), var(--felt-deep) 85%);background-attachment:fixed;color:var(--ink);font-family:var(--body);font-size:15px}
+[hidden]{display:none!important}
+.wrap{max-width:1100px;margin:0 auto;padding-inline:16px;padding-block:14px 28px;display:flex;flex-direction:column;gap:12px}
+header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px}
+h1{font-family:var(--display);font-weight:400;font-size:clamp(1.55rem,5vw,2.2rem);margin:0;text-wrap:balance}
+h1 em{color:var(--gold)}
+.side{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px}
+.stats{display:flex;gap:16px;color:var(--muted);font-variant-numeric:tabular-nums;font-size:.92rem}
+.stats b{color:var(--ink);font-weight:500}
+button{font:inherit;font-weight:500;color:var(--ink);background:rgba(0,0,0,.24);border:1px solid var(--line);border-radius:999px;padding:6px 15px;cursor:pointer}
+button:hover{background:rgba(0,0,0,.42)}
+button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+button.gold{background:var(--gold);color:#2b1d12;border-color:var(--gold)}
+#board{position:relative;touch-action:none;user-select:none;-webkit-user-select:none;min-height:300px}
+.slot{position:absolute;box-sizing:border-box;border-radius:7px;border:1.5px dashed var(--line);background:rgba(255,255,255,.04)}
+.card{position:absolute;left:0;top:0;border-radius:6px;box-shadow:0 1px 2px rgba(0,0,0,.5),0 3px 8px rgba(0,0,0,.22);transition:left .2s ease,top .2s ease}
+.card{background:#fff;overflow:hidden}
+.card img{width:100%;height:100%;display:block;pointer-events:none;-webkit-user-drag:none}
+.idx{position:absolute;font:700 clamp(9px,1.5vw,13px)/1 Georgia,serif;color:#1b1410;background:rgba(255,255,255,.92);border-radius:3px;padding:2px 3px;pointer-events:none}
+.idx.tl{left:4%;top:3%}.idx.br{right:4%;bottom:3%}
+#board.nonum .idx{display:none}
+.card.free{cursor:grab}
+.card.drag{transition:none;cursor:grabbing;box-shadow:0 10px 22px rgba(0,0,0,.5)}
+.card.shake{animation:shake .32s}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+@media (prefers-reduced-motion:reduce){.card{transition:none}.card.shake{animation:none}}
+details{border-top:1px solid var(--line);padding-top:10px;max-width:65ch;line-height:1.5}
+summary{cursor:pointer;font-family:var(--display);font-size:1.2rem}
+details ul{padding-left:1.2em;margin:.5em 0}
+#end{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,25,17,.6);z-index:5000;padding-inline:16px}
+#end>div{background:var(--felt-deep);border:1px solid var(--gold);border-radius:10px;padding:22px 26px;text-align:center;display:flex;flex-direction:column;gap:10px;align-items:center;max-width:360px}
+#end h2{font-family:var(--display);font-weight:400;font-size:2rem;margin:0;color:var(--gold)}
+#end p{margin:0;color:var(--muted)}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Solitario di <em>Napoleone</em></h1>
+    <div class="side">
+      <div class="stats"><span>Mosse <b id="moves">0</b></span><span>Sugli Assi <b id="based">4</b>/40</span></div>
+      <button id="btnNum" type="button" aria-pressed="true">Numeri: sì</button>
+      <button id="btnNew" type="button">Nuova distribuzione</button>
+    </div>
+  </header>
+  <div id="board" aria-label="Tavolo da gioco"></div>
+  <details id="rules">
+    <summary>Regole</summary>
+    <ul>
+      <li>Al centro ci sono i quattro Assi: Denari, Spade, Bastoni, Coppe. Le altre 36 carte sono distribuite a caso in otto righe, una a sinistra e una a destra di ogni Asso.</li>
+      <li>Lo scopo è portare sopra ogni Asso tutte le carte del suo seme, in ordine, fino al Re. Ordine: Asso, 2…7, Fante, Cavallo, Re.</li>
+      <li>Si sposta una carta alla volta, e solo la più lontana dall'Asso in ogni riga.</li>
+      <li>Una carta può andare sull'Asso del suo seme se ha un punto in più della carta in cima. Una volta lì non si riprende.</li>
+      <li>Può andare su una riga vuota, oppure in fondo a un'altra riga se l'ultima carta di quella riga è di seme diverso e ha un punto in più. Esempio: il 4 di Bastoni va sul 5 di Spade.</li>
+      <li>Se non ci sono più mosse, o se quelle rimaste non possono più portare tutte le carte sugli Assi, la partita è persa e si riparte con una nuova distribuzione.</li>
+    </ul>
+    <p>Tocca una carta per mandarla dove può andare, oppure trascinala dove vuoi.</p>
+  </details>
+</div>
+<div id="end" hidden><div><h2 id="endTitle"></h2><p id="endText"></p><button id="btnEndNew" type="button" class="gold">Nuova distribuzione</button></div></div>
+
+<script>
+(() => {
+const CARD_IMG = {"d1": "carte/d1.jpg", "d2": "carte/d2.jpg", "d3": "carte/d3.jpg", "d4": "carte/d4.jpg", "d5": "carte/d5.jpg", "d6": "carte/d6.jpg", "d7": "carte/d7.jpg", "d8": "carte/d8.jpg", "d9": "carte/d9.jpg", "d10": "carte/d10.jpg", "c1": "carte/c1.jpg", "c2": "carte/c2.jpg", "c3": "carte/c3.jpg", "c4": "carte/c4.jpg", "c5": "carte/c5.jpg", "c6": "carte/c6.jpg", "c7": "carte/c7.jpg", "c8": "carte/c8.jpg", "c9": "carte/c9.jpg", "c10": "carte/c10.jpg", "b1": "carte/b1.jpg", "b2": "carte/b2.jpg", "b3": "carte/b3.jpg", "b4": "carte/b4.jpg", "b5": "carte/b5.jpg", "b6": "carte/b6.jpg", "b7": "carte/b7.jpg", "b8": "carte/b8.jpg", "b9": "carte/b9.jpg", "b10": "carte/b10.jpg", "s1": "carte/s1.jpg", "s2": "carte/s2.jpg", "s3": "carte/s3.jpg", "s4": "carte/s4.jpg", "s5": "carte/s5.jpg", "s6": "carte/s6.jpg", "s7": "carte/s7.jpg", "s8": "carte/s8.jpg", "s9": "carte/s9.jpg", "s10": "carte/s10.jpg"};
+
+const SUIT_NAME = {d:'Denari', c:'Coppe', s:'Spade', b:'Bastoni'};
+const RANK_NAME = {1:'Asso', 8:'Fante', 9:'Cavallo', 10:'Re'};
+const name = (s, r) => `${RANK_NAME[r] || r} di ${SUIT_NAME[s]}`;
+const RATIO = 455 / 240;   // proporzioni delle carte ritagliate
+
+/* ---------- Regole ---------- */
+const ORDER = ['d', 's', 'b', 'c'];          // Assi dall'alto in basso
+const SIZES = [5, 5, 5, 5, 4, 4, 4, 4];       // righe: per ogni Asso prima sinistra, poi destra
+const KEY = 'solitario-piacentino-v2';
+let S, LOC = {}, drag = null;
+const board = document.getElementById('board');
+const EL = {}, SLOT = [];
+let cw, ch, g, vg, ox, cx0;
+
+function newGame() {
+  const deck = [];
+  ORDER.forEach(s => { for (let r = 2; r <= 10; r++) deck.push({id: s + r, s, r}); });
+  for (let i = deck.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [deck[i], deck[j]] = [deck[j], deck[i]]; }
+  const rows = SIZES.map(n => deck.splice(0, n));
+  const found = {};
+  ORDER.forEach(s => found[s] = [{id: s + 1, s, r: 1}]);
+  S = {rows, found, moves: 0};
+  document.getElementById('end').hidden = true;
+  after();
+}
+const based = () => ORDER.reduce((n, s) => n + S.found[s].length, 0);
+const pileArr = l => l.pile === 'found' ? S.found[l.key] : S.rows[l.key];
+const isFree = l => l.pile === 'row' && l.idx === S.rows[l.key].length - 1;
+
+function canDrop(card, to, from) {
+  if (to.pile === 'found') {
+    const f = S.found[to.key];
+    return card.s === to.key && card.r === f[f.length - 1].r + 1;
+  }
+  if (to.key === from.key) return false;
+  const row = S.rows[to.key];
+  if (!row.length) return S.rows[from.key].length > 1;   // spostare l'unica carta su un'altra riga vuota non cambia nulla
+  const last = row[row.length - 1];
+  return last.s !== card.s && last.r === card.r + 1;
+}
+function targets(from) {
+  const card = S.rows[from.key][from.idx], out = [];
+  const f = {pile: 'found', key: card.s};
+  if (canDrop(card, f, from)) out.push(f);
+  S.rows.forEach((row, k) => { if (row.length && canDrop(card, {pile: 'row', key: k}, from)) out.push({pile: 'row', key: k}); });
+  S.rows.forEach((row, k) => { if (!row.length && canDrop(card, {pile: 'row', key: k}, from)) out.push({pile: 'row', key: k}); });
+  return out;
+}
+const hasMoves = () => S.rows.some((row, k) => row.length && targets({pile: 'row', key: k, idx: row.length - 1}).length);
+
+function doMove(from, to) {
+  const card = S.rows[from.key].pop();
+  pileArr(to).push(card);
+  S.moves++;
+  after();
+}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+function load() { try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && d.rows && d.found) { S = d; return true; } } catch (e) {} return false; }
+function showEnd(kind) {
+  const text = {
+    won: `Tutte le carte sono sugli Assi in ${S.moves} mosse.`,
+    lost: 'Non ci sono più mosse possibili. Si riparte con una nuova distribuzione delle carte.',
+    stuck: 'Da qui non c\'è più modo di portare tutte le carte sugli Assi: le mosse rimaste girano a vuoto. Si riparte con una nuova distribuzione delle carte.',
+  }[kind];
+  document.getElementById('endTitle').textContent = kind === 'won' ? 'Hai vinto!' : 'Partita persa';
+  document.getElementById('endText').textContent = text;
+  setTimeout(() => { document.getElementById('end').hidden = false; }, 350);
+}
+function after() {
+  save(); render();
+  checkId++;
+  if (based() === 40) showEnd('won');
+  else if (!hasMoves()) showEnd('lost');
+  else if (S.moves > 0) checkSolvable();
+}
+/* ---------- Controllo di risolvibilità ---------- */
+// Risolutore: cerca una sequenza di mosse che porti tutte le carte sugli Assi.
+// Carta = seme*10 + (valore-1). rows: array di 8 array (dall'Asso verso l'esterno). found: valore in cima per ogni seme (1 = solo Asso).
+// Ritorna true (risolvibile), false (sicuramente no) oppure null (troppi casi, non si sa).
+function solve(rows0, found0, limit) {
+  const seen = new Set();
+  let nodes = 0;
+  const suit = c => (c / 10) | 0, rank = c => (c % 10) + 1;
+  function autoSafe(rows, found) {
+    // Una carta va sull'Asso senza rischi se nessuna carta più bassa di un altro seme può ancora aver bisogno di appoggiarsi su di lei.
+    let moved = true;
+    while (moved) {
+      moved = false;
+      for (const row of rows) {
+        if (!row.length) continue;
+        const c = row[row.length - 1], s = suit(c), r = rank(c);
+        if (found[s] !== r - 1) continue;
+        let safe = true;
+        for (let t = 0; t < 4; t++) if (t !== s && found[t] < r - 1) { safe = false; break; }
+        if (safe) { row.pop(); found[s] = r; moved = true; }
+      }
+    }
+  }
+  function key(rows, found) {
+    return found.join(',') + '|' + rows.map(r => r.join('.')).sort().join('/');
+  }
+  function search(rows0, found0) {
+    const stack = [[rows0, found0]];
+    while (stack.length) {
+      const [rows, found] = stack.pop();
+      autoSafe(rows, found);
+      if (found[0] + found[1] + found[2] + found[3] === 40) return true;
+      const k = key(rows, found);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      if (++nodes > limit) return null;
+      let empty = -1;
+      rows.forEach((r, j) => { if (!r.length && empty < 0) empty = j; });
+      const next = [];
+      const push = (i, j, s) => {
+        const nr = rows.map(r => r.slice()), nf = found.slice();
+        const c = nr[i].pop();
+        if (j < 0) nf[s]++; else nr[j].push(c);
+        next.push([nr, nf]);
+      };
+      rows.forEach((row, i) => {
+        if (!row.length) return;
+        const c = row[row.length - 1], s = suit(c), r = rank(c);
+        if (found[s] === r - 1) push(i, -1, s);
+        rows.forEach((dst, j) => {
+          if (j === i || !dst.length) return;
+          const d = dst[dst.length - 1];
+          if (suit(d) !== s && rank(d) === r + 1) push(i, j);
+        });
+        if (empty >= 0 && row.length > 1) push(i, empty);
+      });
+      // le mosse sugli Assi vengono provate per prime
+      for (let n = next.length - 1; n >= 0; n--) stack.push(next[n]);
+    }
+    return false;
+  }
+  return search(rows0.map(r => r.slice()), found0.slice());
+}
+
+let worker = null, checkId = 0;
+try {
+  const src = solve.toString() + '\nonmessage = e => postMessage({id: e.data.id, res: solve(e.data.rows, e.data.found, e.data.limit)});';
+  worker = new Worker(URL.createObjectURL(new Blob([src], {type: 'text/javascript'})));
+  worker.onmessage = e => { if (e.data.id === checkId && e.data.res === false) showEnd('stuck'); };
+} catch (err) { worker = null; }
+function checkSolvable() {
+  const id = ++checkId;
+  const code = c => ORDER.indexOf(c.s) * 10 + c.r - 1;
+  const rows = S.rows.map(r => r.map(code)), found = ORDER.map(s => S.found[s].length);
+  if (worker) worker.postMessage({id, rows, found, limit: 300000});
+  else setTimeout(() => { if (id === checkId && solve(rows, found, 20000) === false) showEnd('stuck'); }, 50);
+}
+
+/* ---------- Disegno del tavolo ---------- */
+function build() {
+  for (let k = 0; k < 8; k++) { const d = document.createElement('div'); d.className = 'slot'; board.appendChild(d); SLOT.push(d); }
+  ORDER.forEach(s => { for (let r = 1; r <= 10; r++) {
+    const d = document.createElement('div'); d.className = 'card'; d.dataset.id = s + r;
+    d.setAttribute('role', 'img'); d.setAttribute('aria-label', name(s, r));
+    d.innerHTML = `<img src="${CARD_IMG[s + r]}" alt="" draggable="false"><span class="idx tl">${r}</span><span class="idx br">${r}</span>`;
+    board.appendChild(d); EL[s + r] = d;
+  } });
+}
+function layout() {
+  const W = board.clientWidth;
+  const n = Math.max(6, ...S.rows.map(r => r.length));
+  const top = board.getBoundingClientRect().top + window.scrollY;
+  const availH = Math.max(320, window.innerHeight - Math.min(top, 140) - 24);
+  cw = Math.max(40, Math.min(110, W / (3.2 + .44 * (n - 1)), availH / (RATIO * 4.3)));
+  ch = cw * RATIO; g = cw * .1; vg = ch * .1;
+  ox = Math.max(cw * .16, Math.min(cw * .34, (W / 2 - 1.5 * cw - g) / (n - 1)));
+  cx0 = (W - cw) / 2;
+}
+const rowX = (k, j) => k % 2 === 0 ? cx0 - g - cw - j * ox : cx0 + cw + g + j * ox;
+const rowY = k => Math.floor(k / 2) * (ch + vg);
+function render() {
+  layout();
+  const box = (el, x, y) => Object.assign(el.style, {left: x + 'px', top: y + 'px', width: cw + 'px', height: ch + 'px'});
+  SLOT.forEach((el, k) => box(el, rowX(k, 0), rowY(k)));
+  LOC = {};
+  ORDER.forEach((s, i) => S.found[s].forEach((c, j) => {
+    const el = EL[c.id]; box(el, cx0, i * (ch + vg)); el.style.zIndex = 10 + j; el.classList.remove('free');
+    LOC[c.id] = {pile: 'found', key: s, idx: j};
+  }));
+  S.rows.forEach((row, k) => row.forEach((c, j) => {
+    const el = EL[c.id]; box(el, rowX(k, j), rowY(k)); el.style.zIndex = 10 + j;
+    LOC[c.id] = {pile: 'row', key: k, idx: j};
+    el.classList.toggle('free', j === row.length - 1);
+  }));
+  board.style.height = 4 * ch + 3 * vg + 'px';
+  document.getElementById('moves').textContent = S.moves;
+  document.getElementById('based').textContent = based();
+}
+
+/* ---------- Tocchi e trascinamento ---------- */
+board.addEventListener('pointerdown', e => {
+  if (e.button > 0) return;
+  const el = e.target.closest('.card');
+  if (!el) return;
+  const l = LOC[el.dataset.id];
+  if (!isFree(l)) return;
+  e.preventDefault();
+  drag = {l, el, card: S.rows[l.key][l.idx], x0: e.clientX, y0: e.clientY, ox: parseFloat(el.style.left), oy: parseFloat(el.style.top), moved: false};
+  board.setPointerCapture(e.pointerId);
+});
+board.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
+  if (!drag.moved && Math.hypot(dx, dy) < 6) return;
+  drag.moved = true; drag.dx = dx; drag.dy = dy;
+  drag.el.classList.add('drag');
+  Object.assign(drag.el.style, {left: drag.ox + dx + 'px', top: drag.oy + dy + 'px', zIndex: 1000});
+});
+function shake(el) { el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); }
+function endDrag(cancel) {
+  if (!drag) return;
+  const d = drag; drag = null;
+  d.el.classList.remove('drag');
+  if (cancel) { render(); return; }
+  if (!d.moved) {
+    const t = targets(d.l);
+    if (t.length) doMove(d.l, t[0]); else shake(d.el);
+    return;
+  }
+  const cx = d.ox + d.dx + cw / 2, cy = d.oy + d.dy + ch / 2;
+  const i = Math.max(0, Math.min(3, Math.floor((cy + vg / 2) / (ch + vg))));
+  const to = cx < cx0 - g / 2 ? {pile: 'row', key: 2 * i}
+           : cx > cx0 + cw + g / 2 ? {pile: 'row', key: 2 * i + 1}
+           : {pile: 'found', key: ORDER[i]};
+  if (canDrop(d.card, to, d.l)) doMove(d.l, to); else { render(); shake(d.el); }
+}
+board.addEventListener('pointerup', () => endDrag(false));
+board.addEventListener('pointercancel', () => endDrag(true));
+board.addEventListener('animationend', e => e.target.classList.remove('shake'));
+
+const NUMKEY = 'solitario-numeri';
+function setNum(on) {
+  board.classList.toggle('nonum', !on);
+  const b = document.getElementById('btnNum'); b.textContent = 'Numeri: ' + (on ? 'sì' : 'no'); b.setAttribute('aria-pressed', on);
+  try { localStorage.setItem(NUMKEY, on ? '1' : '0'); } catch (e) {}
+}
+let numOn = true; try { numOn = localStorage.getItem(NUMKEY) !== '0'; } catch (e) {}
+setNum(numOn);
+document.getElementById('btnNum').onclick = () => { numOn = !numOn; setNum(numOn); };
+document.getElementById('btnNew').onclick = () => newGame();
+document.getElementById('btnEndNew').onclick = () => newGame();
+window.addEventListener('resize', () => render());
+
+function start(data) {
+  build();
+  if (data && data.S) { S = data.S; save(); render(); }
+  else if (load()) after();
+  else newGame();
+}
+window.claude?.hot?.snapshot?.(() => ({S}));
+window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+})();
+</script>
+</html>
