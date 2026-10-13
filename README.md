@@ -6,10 +6,16 @@ Al centro ci sono i quattro Assi. Le altre 36 carte sono distribuite in otto rig
 
 ## Come giocare
 
-Apri `index.html` in un browser, su computer o telefono. Non serve installare niente.
+Il gioco è online su https://mregazzi.github.io/SolitarioDiNapoleone/. In alternativa apri `index.html` in un browser, su computer o telefono. Non serve installare niente.
 
 Tocca la carta più esterna di una riga per mandarla dove può andare, oppure trascinala. Dopo ogni mossa il gioco controlla se la partita si può ancora vincere: se non si può, la dichiara persa.
 
 ## Carte
 
 Le immagini delle 40 carte nella cartella `carte/` sono ritagliate dalla foto "Carte piacentine al completo.jpg" pubblicata su Wikipedia, liberamente utilizzabile.
+
+## Pubblicazione
+
+Ogni volta che si pubblica una nuova release su GitHub, la procedura in `.github/workflows/pubblica.yml` aggiorna il gioco online. La si può anche avviare a mano dalla scheda Actions.
+
+Serve una sola impostazione, da fare una volta: in Settings → Pages, alla voce "Source", scegliere "GitHub Actions".
